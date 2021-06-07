@@ -1,7 +1,9 @@
 """Script that downloads a public dataset and streams it to an Elasticsearch cluster"""
 
+import glob
 import csv
 from os.path import abspath, join, dirname, exists
+from os import scandir
 import tqdm
 import urllib3
 from elasticsearch import Elasticsearch
@@ -13,11 +15,12 @@ DOWNLOAD_URL = (
 )
 
 #provide a localfile name
-DATFILE_NAME = './data/KDD_NID.csv'
+DATA_DIR = 'data'
+FILE_EXT = '.csv'
 INDEX_NAME = 'kdd-events-1'
 ELASTIC_URL = 'http://localhost:9200/'
 
-DATASET_PATH = join(dirname(abspath(__file__)), DATFILE_NAME)
+DATASET_PATH = join(dirname(abspath(__file__)), DATA_DIR)
 CHUNK_SIZE = 16384
 
 
@@ -25,7 +28,8 @@ def download_dataset():
     """Downloads the public dataset if not locally downlaoded
     and returns the number of rows are in the .csv file.
     """
-    if not exists(DATASET_PATH):
+    print(DATASET_PATH)
+    if  not any(scandir(DATASET_PATH)):
         http = urllib3.PoolManager()
         resp = http.request("GET", DOWNLOAD_URL, preload_content=False)
 
@@ -38,8 +42,14 @@ def download_dataset():
                 f.write(chunk)
                 chunk = resp.read(CHUNK_SIZE)
 
-    with open(DATASET_PATH) as f:
-        return sum([1 for _ in f]) - 1
+    files = glob.glob(f'{DATASET_PATH}/*{FILE_EXT}')
+
+    total = 0
+    for file in files:
+        with open(file) as f:
+            total  += sum([1 for _ in f]) - 1
+    
+    return total
 
 
 def create_index(client):
@@ -62,72 +72,79 @@ def create_index(client):
     )
 
 
+    
+
 def generate_actions():
     """Reads the file through csv.DictReader() and for each row
     yields a single document. This function is passed into the bulk()
     helper to create many documents in sequence.
     """
-    with open(DATASET_PATH, mode="r") as f:
-        reader = csv.DictReader(f)
+    files = glob.glob(f'{DATASET_PATH}/*{FILE_EXT}')
 
-        for row in reader:
-            doc = {
-                # "_id": row["CAMIS"],
-                'first_col':row['first_col'],
-                'duration':row['duration'],
-                'protocol_type':row['protocol_type'],
-                'service':row['service'],
-                'flag':row['flag'],
-                'src_bytes':row['src_bytes'],
-                'dst_bytes':row['dst_bytes'],
-                'land':row['land'],
-                'wrong_fragment':row['wrong_fragment'],
-                'urgent':row['urgent'],
-                'hot':row['hot'],
-                'num_failed_logins':row['num_failed_logins'],
-                'logged_in':row['logged_in'],
-                'num_compromised':row['num_compromised'],
-                'root_shell':row['root_shell'],
-                'su_attempted':row['su_attempted'],
-                'num_root':row['num_root'],
-                'num_file_creations':row['num_file_creations'],
-                'num_shells':row['num_shells'],
-                'num_access_files':row['num_access_files'],
-                'num_outbound_cmds':row['num_outbound_cmds'],
-                'is_host_login':row['is_host_login'],
-                'is_guest_login':row['is_guest_login'],
-                'count':row['count'],
-                'srv_count':row['srv_count'],
-                'serror_rate':row['serror_rate'],
-                'srv_serror_rate':row['srv_serror_rate'],
-                'rerror_rate':row['rerror_rate'],
-                'srv_rerror_rate':row['srv_rerror_rate'],
-                'same_srv_rate':row['same_srv_rate'],
-                'diff_srv_rate':row['diff_srv_rate'],
-                'srv_diff_host_rate':row['srv_diff_host_rate'],
-                'dst_host_count':row['dst_host_count'],
-                'dst_host_srv_count':row['dst_host_srv_count'],
-                'dst_host_same_srv_rate':row['dst_host_same_srv_rate'],
-                'dst_host_diff_srv_rate':row['dst_host_diff_srv_rate'],
-                'dst_host_same_src_port_rate':row['dst_host_same_src_port_rate'],
-                'dst_host_srv_diff_host_rate':row['dst_host_srv_diff_host_rate'],
-                'dst_host_serror_rate':row['dst_host_serror_rate'],
-                'dst_host_srv_serror_rate':row['dst_host_srv_serror_rate'],
-                'dst_host_rerror_rate':row['dst_host_rerror_rate'],
-                'dst_host_srv_rerror_rate':row['dst_host_srv_rerror_rate'],
-                'attack_type':row['attack_type'],
-                'attack_class':row['attack_class']
+    for data_file in files:
+        with open(data_file, mode="r") as f:
+            reader = csv.DictReader(f)
 
-            }
+            for row in reader:
+                doc = {
+                    # "_id": row["CAMIS"],
+                    'first_col':row['first_col'],
+                    'duration':row['duration'],
+                    'protocol_type':row['protocol_type'],
+                    'service':row['service'],
+                    'flag':row['flag'],
+                    'src_bytes':row['src_bytes'],
+                    'dst_bytes':row['dst_bytes'],
+                    'land':row['land'],
+                    'wrong_fragment':row['wrong_fragment'],
+                    'urgent':row['urgent'],
+                    'hot':row['hot'],
+                    'num_failed_logins':row['num_failed_logins'],
+                    'logged_in':row['logged_in'],
+                    'num_compromised':row['num_compromised'],
+                    'root_shell':row['root_shell'],
+                    'su_attempted':row['su_attempted'],
+                    'num_root':row['num_root'],
+                    'num_file_creations':row['num_file_creations'],
+                    'num_shells':row['num_shells'],
+                    'num_access_files':row['num_access_files'],
+                    'num_outbound_cmds':row['num_outbound_cmds'],
+                    'is_host_login':row['is_host_login'],
+                    'is_guest_login':row['is_guest_login'],
+                    'count':row['count'],
+                    'srv_count':row['srv_count'],
+                    'serror_rate':row['serror_rate'],
+                    'srv_serror_rate':row['srv_serror_rate'],
+                    'rerror_rate':row['rerror_rate'],
+                    'srv_rerror_rate':row['srv_rerror_rate'],
+                    'same_srv_rate':row['same_srv_rate'],
+                    'diff_srv_rate':row['diff_srv_rate'],
+                    'srv_diff_host_rate':row['srv_diff_host_rate'],
+                    'dst_host_count':row['dst_host_count'],
+                    'dst_host_srv_count':row['dst_host_srv_count'],
+                    'dst_host_same_srv_rate':row['dst_host_same_srv_rate'],
+                    'dst_host_diff_srv_rate':row['dst_host_diff_srv_rate'],
+                    'dst_host_same_src_port_rate':row['dst_host_same_src_port_rate'],
+                    'dst_host_srv_diff_host_rate':row['dst_host_srv_diff_host_rate'],
+                    'dst_host_serror_rate':row['dst_host_serror_rate'],
+                    'dst_host_srv_serror_rate':row['dst_host_srv_serror_rate'],
+                    'dst_host_rerror_rate':row['dst_host_rerror_rate'],
+                    'dst_host_srv_rerror_rate':row['dst_host_srv_rerror_rate'],
+                    'attack_type':row['attack_type'],
+                    'attack_class':row['attack_class']
 
-            # For complex documents -- inner documents
+                }
 
-            # lat = row["Latitude"]
-            # lon = row["Longitude"]
-            # if lat not in ("", "0") and lon not in ("", "0"):
-            #     doc["location"] = {"lat": float(lat), "lon": float(lon)}
+                # For complex documents -- inner documents
 
-            yield doc
+                # lat = row["Latitude"]
+                # lon = row["Longitude"]
+                # if lat not in ("", "0") and lon not in ("", "0"):
+                #     doc["location"] = {"lat": float(lat), "lon": float(lon)}
+
+                yield doc
+
+    
 
 
 def main():
